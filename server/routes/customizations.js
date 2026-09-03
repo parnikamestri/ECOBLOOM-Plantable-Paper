@@ -1,0 +1,16 @@
+import express from 'express';
+import { pool } from '../config/db.js';
+import { protect, adminOnly } from '../middleware/auth.js';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+const router=express.Router();
+const uploadDir=path.resolve('uploads');
+fs.mkdirSync(uploadDir,{recursive:true});
+const upload=multer({dest:uploadDir,limits:{fileSize:5*1024*1024}});
+router.post('/',protect,async(req,res)=>{const {productId,requestTitle,customText,quantity=1,size='',paperType='',seedType='',uploadedDesign=''}=req.body;const [r]=await pool.query('INSERT INTO customization_requests(user_id,product_id,request_title,custom_text,quantity,size,paper_type,seed_type,uploaded_design) VALUES(?,?,?,?,?,?,?,?,?)',[req.user.user_id,productId||null,requestTitle||'Custom product request',customText||'',quantity,size,paperType,seedType,uploadedDesign]);res.status(201).json({requestId:r.insertId,message:'Customization request submitted'});});
+router.post('/upload',protect,upload.single('design'),async(req,res)=>{res.json({path:req.file?`/uploads/${req.file.filename}`:''})});
+router.get('/mine',protect,async(req,res)=>{const [r]=await pool.query(`SELECT cr.*,p.product_name AS product_name FROM customization_requests cr LEFT JOIN products p ON p.product_id=cr.product_id WHERE cr.user_id=? ORDER BY cr.created_at DESC`,[req.user.user_id]);res.json(r);});
+router.get('/',protect,adminOnly,async(req,res)=>{const [r]=await pool.query(`SELECT cr.*,p.product_name AS product_name,u.name AS user_name,u.email AS user_email FROM customization_requests cr LEFT JOIN products p ON p.product_id=cr.product_id JOIN users u ON u.user_id=cr.user_id ORDER BY cr.created_at DESC`);res.json(r);});
+router.patch('/:id/status',protect,adminOnly,async(req,res)=>{await pool.query('UPDATE customization_requests SET status=?,admin_note=? WHERE request_id=?',[req.body.status,req.body.adminNote||'',req.params.id]);res.json({message:'Customization updated'});});
+export default router;

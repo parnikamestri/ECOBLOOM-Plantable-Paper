@@ -1,0 +1,19 @@
+import {useEffect,useMemo,useState} from 'react';
+import {Link,useSearchParams} from 'react-router-dom';
+import {Search,SlidersHorizontal,X} from 'lucide-react';
+import ProductCard from '../components/ProductCard';
+import {api} from '../api';
+
+export default function Products({onAdd}){
+ const [p,setP]=useState([]); const [params,setParams]=useSearchParams();
+ const [query,setQuery]=useState(params.get('q')||''); const [cat,setCat]=useState(params.get('category')||'All'); const [sort,setSort]=useState('featured'); const [max,setMax]=useState('');
+ useEffect(()=>{api('/products').then(setP).catch(()=>{})},[]);
+ const cats=['All',...new Set(p.map(x=>x.category).filter(Boolean))];
+ const shown=useMemo(()=>{let a=p.filter(x=>(cat==='All'||x.category===cat)&&(!query||`${x.name} ${x.category} ${x.seedType} ${x.description}`.toLowerCase().includes(query.toLowerCase()))&&(!max||Number(x.price)<=Number(max))); return [...a].sort((a,b)=>sort==='priceLow'?a.price-b.price:sort==='priceHigh'?b.price-a.price:sort==='name'?a.name.localeCompare(b.name):Number(b.featured)-Number(a.featured));},[p,cat,query,max,sort]);
+ const update=(key,val)=>{if(key==='category')setCat(val); if(key==='q')setQuery(val); setParams(prev=>{const n=new URLSearchParams(prev); if(val&&val!=='All')n.set(key,val);else n.delete(key); return n;});};
+ return <main className="page shopPage"><div className="shopHero"><div><span className="eyebrow">THE ECOBLOOM SHOP</span><h1>Thoughtful paper.<br/><em>Made to grow.</em></h1><p>Explore plantable invitations, gifts and everyday paper goods designed for beautiful moments and a greener afterlife.</p></div><div className="shopBadge"><b>{p.length || '—'}</b><span>plantable<br/>products</span></div></div>
+ <div className="shopToolbar"><div className="searchBox"><Search size={18}/><input value={query} onChange={e=>update('q',e.target.value)} placeholder="Search products, seeds, gifts..."/><kbd>⌘ K</kbd></div><select value={sort} onChange={e=>setSort(e.target.value)}><option value="featured">Sort: Featured</option><option value="priceLow">Price: Low to high</option><option value="priceHigh">Price: High to low</option><option value="name">Name A–Z</option></select></div>
+ <div className="shopLayout"><aside className="filtersPanel"><div className="filterTitle"><span><SlidersHorizontal size={17}/> Filters</span>{(cat!=='All'||max)&&<button onClick={()=>{setCat('All');setMax('');setParams({})}}>Clear</button>}</div><h4>Categories</h4><div className="filterList">{cats.map(c=><button className={cat===c?'active':''} onClick={()=>update('category',c)} key={c}>{c}<span>{c==='All'?p.length:p.filter(x=>x.category===c).length}</span></button>)}</div><h4>Price</h4><div className="priceChoices">{[['','Any price'],['499','Under ₹499'],['999','Under ₹999'],['1499','Under ₹1,499']].map(([v,t])=><button className={max===v?'active':''} key={v} onClick={()=>setMax(v)}>{t}</button>)}</div></aside>
+ <section className="shopResults"><div className="resultBar"><span>{shown.length} products</span>{(cat!=='All'||query||max)&&<div className="chips">{cat!=='All'&&<button onClick={()=>update('category','All')}>{cat}<X size={13}/></button>}{query&&<button onClick={()=>update('q','')}>“{query}”<X size={13}/></button>}{max&&<button onClick={()=>setMax('')}>Under ₹{Number(max).toLocaleString()}<X size={13}/></button>}</div>}</div>{!shown.length?<div className="empty shopEmpty"><div className="emptyIcon">🌱</div><h2>No products found</h2><p>Try another search or clear your filters.</p><button className="primary" onClick={()=>{setQuery('');setCat('All');setMax('');setParams({})}}>Clear filters</button></div>:<div className="grid">{shown.map(x=><ProductCard key={x._id} product={x} onAdd={onAdd}/>)}</div>}</section></div>
+ <p className="shopFootnote">Prices shown are product prices. Custom quantities, artwork, seed choices and bulk orders can be requested from the product page.</p></main>
+}
